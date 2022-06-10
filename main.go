@@ -1,11 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"encoding/csv"
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -14,6 +14,7 @@ import (
 	"github.com/influxdata/influxdb1-client/v2"
 	"github.com/jpillora/backoff"
 	"github.com/jpillora/opts"
+	"github.com/tarm/serial"
 )
 
 var VERSION = "0.0.0-src"
@@ -32,9 +33,10 @@ type config struct {
 	NoAutoCreate    bool   `help:"Disable automatic creation of database"`
 	ForceFloat      bool   `help:"Force all numeric values to insert as float"`
 	ForceString     bool   `help:"Force all numeric values to insert as string"`
-	TreatNull	    bool   `help:"Force treating 'null' string values as such"`
+	TreatNull       bool   `help:"Force treating 'null' string values as such"`
 	Attempts        int    `help:"Maximum number of attempts to send data to influxdb before failing"`
-	HttpTimeout	    int    `help:"Timeout (in seconds) for http writes used by underlying influxdb client"`
+	HttpTimeout     int    `help:"Timeout (in seconds) for http writes used by underlying influxdb client"`
+	USBDev          string `help:"USB serialdevice to read from"`
 }
 
 func main() {
@@ -52,7 +54,8 @@ func main() {
 		TreatNull:       false,
 		TimestampColumn: "timestamp",
 		TimestampFormat: "2006-01-02 15:04:05",
-		HttpTimeout:	 10,
+		HttpTimeout:     10,
+		USBDev:          "/dev/ttyUSB1",
 	}
 
 	//parse config
@@ -119,39 +122,47 @@ func main() {
 	}
 
 	//open csv file
-	f, err := os.Open(conf.CSVFile)
-	if err != nil {
-		log.Fatalf("Failed to open %s", conf.CSVFile)
+	// f, err := os.Open(conf.CSVFile)
+	// if err != nil {
+	// 	log.Fatalf("Failed to open %s", conf.CSVFile)
+	// }
+	serialConfig := &serial.Config{Name: conf.USBDev, Baud: 115200}
+	serialPort, err := serial.OpenPort(serialConfig)
+	for err != nil {
+		log.Printf("[WARN] Can't open serial port, trying to sleep it off: %s\n", err)
+		time.Sleep(10 * time.Second)
+		serialPort, err = serial.OpenPort(serialConfig)
 	}
-
+	reader := bufio.NewReader(serialPort)
 	//headers and init fn
-	var firstField string
-	var headers []string
-	setHeaders := func(hdrs []string) {
-		//check timestamp and tag columns
-		hasTs := false
-		n := len(tagNames)
-		for _, h := range hdrs {
-			if h == conf.TimestampColumn {
-				hasTs = true
-			} else if tagNames[h] {
-				log.Println(h)
-				n--
-			} else if firstField == "" {
-				firstField = h
-			}
-		}
-		if firstField == "" {
-			log.Fatalf("You must have at least one field (non-tag)")
-		}
-		if !hasTs {
-			log.Fatalf("Timestamp column (%s) does not match any header (%s)", conf.TimestampColumn, strings.Join(headers, ","))
-		}
-		if n > 0 {
-			log.Fatalf("Tag names (%s) to do not all have matching headers (%s)", conf.TagColumns, strings.Join(headers, ","))
-		}
-		headers = hdrs
-	}
+	// var firstField string
+	// Setting these manually
+	var headers = []string{"timestamp", "x_accel", "y_accel", "z_accel"}
+	// setHeaders := func(hdrs []string) {
+	// 	//check timestamp and tag columns
+	// 	hasTs := false
+	// 	n := len(tagNames)
+	// 	for _, h := range hdrs {
+	// 		if h == conf.TimestampColumn {
+	// 			hasTs = true
+	// 		} else if tagNames[h] {
+	// 			log.Println(h)
+	// 			n--
+	// 		} else if firstField == "" {
+	// 			firstField = h
+	// 		}
+	// 	}
+	// 	if firstField == "" {
+	// 		log.Fatalf("You must have at least one field (non-tag)")
+	// 	}
+	// 	if !hasTs {
+	// 		log.Fatalf("Timestamp column (%s) does not match any header (%s)", conf.TimestampColumn, strings.Join(headers, ","))
+	// 	}
+	// 	if n > 0 {
+	// 		log.Fatalf("Tag names (%s) to do not all have matching headers (%s)", conf.TagColumns, strings.Join(headers, ","))
+	// 	}
+	// 	headers = hdrs
+	// }
 
 	var bpConfig = client.BatchPointsConfig{Database: conf.Database}
 	bp, _ := client.NewBatchPoints(bpConfig) //current batch
@@ -193,7 +204,7 @@ func main() {
 	}
 
 	//read csv, line by line
-	r := csv.NewReader(f)
+	r := csv.NewReader(reader)
 	for i := 0; ; i++ {
 		records, err := r.Read()
 		if err != nil {
@@ -202,10 +213,11 @@ func main() {
 			}
 			log.Fatalf("CSV error: %s", err)
 		}
-		if i == 0 {
-			setHeaders(records)
-			continue
-		}
+		// I've set headers manually up top
+		// if i == 0 {
+		// 	setHeaders(records)
+		// 	continue
+		// }
 
 		// Create a point and add to batch
 		tags := map[string]string{}
