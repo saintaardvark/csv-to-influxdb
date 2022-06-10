@@ -238,7 +238,15 @@ func main() {
 				}
 				fields[h] = t
 			} else if conf.TimestampColumn == h && conf.TimestampFormat == "unix" {
-				tt, _ := strconv.Atoi(r)
+				// the strings I've got are seconds since epoch, but
+				// with decimal points -- which confuses
+				// strconf.Atoi().  We have to use
+				// strings.ParseFloat() instead.
+				// tt, _ := strconv.Atoi(r)
+				tt, _ := strconv.ParseFloat(r, 64)
+				// The time.Unix() line up ahead expects nanoseconds,
+				// though.  To accommodate this, we multiply by 1e9.
+				tt *= 1e9
 				ts = time.Unix(0, int64(tt))
 				continue
 			} else if !conf.ForceFloat && !conf.ForceString && integerRe.MatchString(r) {
