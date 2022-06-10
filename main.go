@@ -219,6 +219,13 @@ func main() {
 		// 	continue
 		// }
 
+		// Since we're not getting a timestamp from the serial device,
+		// we create one here & prepend it to `records`.
+		ts := time.Now().UnixNano()
+		// ...and divide by 1e9 to match up with my timestamp code up
+		// ahead.  My, what a bletcherous hack.
+		ts /= 1e9
+
 		// Create a point and add to batch
 		tags := map[string]string{}
 		fields := map[string]interface{}{}
