@@ -203,6 +203,8 @@ func main() {
 		bpSize = 0
 	}
 
+	// Throw away the first line -- there's a lot buffered up here
+	_, _ = reader.ReadString('\n')
 	//read csv, line by line
 	r := csv.NewReader(reader)
 	for i := 0; ; i++ {
