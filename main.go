@@ -213,7 +213,7 @@ func main() {
 			if err == io.EOF {
 				break
 			}
-			log.Fatalf("CSV error: %s", err)
+			log.Fatalf("CSV error: %s (records: %+v)", err, records)
 		}
 		// I've set headers manually up top
 		// if i == 0 {
