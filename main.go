@@ -205,7 +205,29 @@ func main() {
 	}
 
 	// Throw away the first line -- there's a lot buffered up here
-	_, _ = reader.ReadString('\n')
+	log.Println("Throwing away first line...")
+	tmpstring, _ := reader.ReadString('\n')
+	log.Println(tmpstring)
+	// Next, make sure we have the number of fields we expect.
+	attempts := 0
+	for {
+		num_fields_expected := 3
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			log.Printf("Problem reading first line: %+v\n", err)
+		}
+		if line_members := strings.Split(line, ","); len(line_members) == num_fields_expected {
+			break
+		}
+		attempts += 1
+
+		if attempts > 10 {
+			log.Fatal("Could not get expected number of fields -- quitting!")
+		}
+		log.Printf("Did not find expected number of strings (%s), trying again", line)
+		time.Sleep(time.Second)
+	}
+	log.Println("Got expected number of fields.  We're in the groove now!")
 	//read csv, line by line
 	r := csv.NewReader(reader)
 	for i := 0; ; i++ {
