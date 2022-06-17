@@ -187,6 +187,7 @@ func main() {
 				time.Sleep(d)
 				continue
 			}
+			log.Printf("Wrote points!")
 			break
 		}
 		//TODO(jpillora): wait until the new points become readable
