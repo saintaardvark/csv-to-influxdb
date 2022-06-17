@@ -214,7 +214,8 @@ func main() {
 			if err == io.EOF {
 				break
 			}
-			log.Fatalf("CSV error: %s (records: %+v)", err, records)
+			// Used to be log.Fatalf; deciding to skip if there's a problem
+			log.Printf("[ERROR] CSV error: %s (records: %+v), skipping", err, records)
 		}
 		// I've set headers manually up top
 		// if i == 0 {
